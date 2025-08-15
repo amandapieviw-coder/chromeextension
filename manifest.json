@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Twitter Thread Poster",
+  "version": "1.0",
+  "description": "A Chrome extension to help you post threads on Twitter.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "permissions": [
+    "tabs"
+  ]
+}
