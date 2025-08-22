@@ -1,0 +1,24 @@
+{
+  "cookies": [
+    {
+      "name": "auth_token",
+      "value": "your_auth_token_here",
+      "domain": ".twitter.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "ct0",
+      "value": "your_ct0_token_here",
+      "domain": ".twitter.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Lax"
+    }
+  ]
+}
