@@ -33,14 +33,13 @@ async def main():
             await page.locator(textarea_selector).fill(tweet_text)
 
             print("Waiting for the post button...")
-            post_button_selector = "button[data-testid='tweetButton']"
-            await page.wait_for_selector(post_button_selector, timeout=60000)
-
-            # Ensure the button is enabled before clicking
-            await page.wait_for_function(f"document.querySelector('{post_button_selector}').disabled === false")
+            # Using the more specific XPath selector provided by the user.
+            post_button_selector = "//button[@data-testid='tweetButtonInline' and .//span[text()='Post']]"
+            post_button = page.locator(post_button_selector)
 
             print("Clicking the post button...")
-            await page.locator(post_button_selector).click()
+            # Playwright's click action auto-waits for the element to be visible, stable, and enabled.
+            await post_button.click(timeout=60000)
 
             print("Tweet posted successfully!")
             await page.wait_for_timeout(5000)  # Wait 5 seconds to see the result
