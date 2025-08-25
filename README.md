@@ -1,40 +1,45 @@
 # Twitter Automation Script
 
-This script uses Playwright to automate posting a tweet on Twitter. It requires browser cookies for authentication.
+This script uses Playwright to automate posting tweets from a CSV file, complete with an image and automatic session management.
+
+## Features
+
+-   **Automatic Cookie Management**: On the first run, the script will open a browser for you to log in. After a successful login, it saves your session cookies to `twitter_cookies.json`, so you don't have to log in again.
+-   **CSV-driven Content**: Reads tweets from a `tweets.csv` file.
+-   **Image Posting**: Attaches a single image (`image.jpg`) to every tweet posted.
 
 ## Setup
 
-1.  **Install Python dependencies:**
-
+1.  **Install Dependencies:**
     ```bash
     pip install -r requirements.txt
-    ```
-
-2.  **Install Playwright browsers:**
-
-    ```bash
     playwright install
-    ```
-    If you are on Linux, you might need to install system dependencies:
-    ```bash
-    playwright install-deps
+    # On Linux, you may need to install system dependencies:
+    # playwright install-deps
     ```
 
-3.  **Create the cookie file:**
+2.  **Prepare Your Content:**
+    -   **Tweets**: Edit the `tweets.csv` file to include the tweets you want to post. It should have a single column with the header `tweet_text`.
+    -   **Image**: Place the image you want to post in the same directory as the script and name it `image.jpg`. If this file is not found, a dummy placeholder will be created.
 
-    -   Rename the `twitter_cookies.json.example` file to `twitter_cookies.json`.
-    -   You need to get your Twitter cookies to authenticate the script. A simple way to do this is to use a browser extension like **Cookie-Editor**.
-    -   Install the extension in your browser (e.g., Chrome, Firefox).
-    -   Log in to your Twitter account.
-    -   Click the Cookie-Editor extension icon and export your cookies in JSON format.
-    -   Paste the exported cookie array into the `twitter_cookies.json` file, replacing the example content. The final structure should be a JSON object with a "cookies" key containing an array of your cookies.
+## How to Run
 
-## Running the script
+1.  **First Run (Login):**
+    -   Run the script: `python post_on_twitter.py`
+    -   A browser window will open. Please log in to your Twitter account.
+    -   The script will detect when you've logged in, save your session, and then start posting the tweets.
 
-Once you have completed the setup, you can run the script with the following command:
+2.  **Subsequent Runs:**
+    -   Simply run the script again: `python post_on_twitter.py`
+    -   It will use the saved `twitter_cookies.json` to log in automatically and post your tweets.
 
-```bash
-python post_on_twitter.py
+## File Structure
+
 ```
-
-The script will launch a browser, log in using your cookies, and post the tweet "Welcome to automation life".
+.
+├── post_on_twitter.py      # The main script
+├── tweets.csv              # Your list of tweets
+├── image.jpg               # The image to be posted with each tweet
+├── requirements.txt        # Python dependencies
+└── twitter_cookies.json    # Created automatically after the first login
+```

@@ -1,0 +1,4 @@
+tweet_text
+"This is the first tweet from the CSV file! #automation"
+"This is the second tweet, also from the CSV. #python #playwright"
+"Here is a third one, for good measure."
