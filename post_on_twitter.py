@@ -8,46 +8,42 @@ from playwright.async_api import async_playwright, TimeoutError
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 COOKIES_FILE = os.path.join(SCRIPT_DIR, 'twitter_cookies.json')
 CSV_FILE = os.path.join(SCRIPT_DIR, 'threads.csv')
-IMAGE_TO_POST = os.path.join(SCRIPT_DIR, 'image.jpg')
 ERROR_SCREENSHOT_FILE = os.path.join(SCRIPT_DIR, 'error_screenshot.png')
 
 
 async def get_tweet_url(page):
     """
-    After a tweet is posted, this function finds the 'View' link in the confirmation toast
+    After a tweet is posted, finds the 'View' link in the confirmation toast
     and returns the URL of the new tweet.
     """
     try:
-        toast_selector = '[data-testid="toast"]'
-        view_link_selector = 'a[href*="/status/"]'
-        toast = page.locator(toast_selector).first
+        toast = page.locator('[data-testid="toast"]').first
         await toast.wait_for(state='visible', timeout=10000)
 
-        view_link = toast.locator(view_link_selector)
+        view_link = toast.locator('a[href*="/status/"]')
         href = await view_link.get_attribute('href')
         if href:
             return f"https://twitter.com{href}"
         return None
     except TimeoutError:
-        print("Could not find the 'View' link in the confirmation toast.")
+        print("Could not find confirmation toast. Cannot get new tweet URL.")
         return None
 
-async def post_new_tweet(page, tweet_text, image_path=None):
+async def post_new_tweet(page, tweet_text):
     """
     Posts a new tweet from the home timeline.
     """
     print("Waiting for the main tweet textarea...")
-    textarea_selector = "div[data-testid='tweetTextarea_0']"
-    await page.locator(textarea_selector).click()
-    await page.locator(textarea_selector).fill(tweet_text)
-
-    # Image posting logic is disabled for now to focus on threading.
-    # if image_path and os.path.exists(image_path):
-    #     ...
+    # Use the reliable XPath selector for the main composer.
+    textarea_selector = "//div[@contenteditable='true' and contains(@role, 'textbox')]"
+    textarea = page.locator(textarea_selector).first
+    await textarea.wait_for(state='visible', timeout=30000)
+    await textarea.click()
+    await textarea.fill(tweet_text)
 
     print("Clicking the 'Post' button for the new tweet...")
-    post_button_selector = "button[data-testid='tweetButton']"
-    await page.locator(post_button_selector).click()
+    # Use the data-testid for the post button.
+    await page.get_by_test_id("tweetButton").click()
 
     return await get_tweet_url(page)
 
@@ -56,11 +52,15 @@ async def post_reply(page, reply_text):
     Posts a reply to the tweet currently open on the page.
     """
     print("Waiting for the reply textarea...")
-    reply_textarea_selector = "div[data-testid='tweetTextarea_0']"
-    await page.locator(reply_textarea_selector).click()
-    await page.locator(reply_textarea_selector).fill(reply_text)
+    # The reply textarea has a specific aria-label.
+    reply_textarea_selector = "div[aria-label='Tweet your reply']"
+    textarea = page.locator(reply_textarea_selector)
+    await textarea.wait_for(state='visible', timeout=30000)
+    await textarea.click()
+    await textarea.fill(reply_text)
 
     print("Clicking the 'Reply' button...")
+    # The reply button also has a data-testid, but we filter by the text "Reply".
     await page.get_by_test_id("tweetButton").filter(has_text="Reply").click()
 
     return await get_tweet_url(page)
@@ -85,7 +85,7 @@ async def post_thread(page, thread_data):
     comments = [thread_data.get(f'comment{i}') for i in range(1, 10) if thread_data.get(f'comment{i}')]
 
     for i, comment_text in enumerate(comments):
-        print(f"Navigating to previous tweet to reply: {tweet_url}")
+        print(f"\nNavigating to previous tweet to reply: {tweet_url}")
         await page.goto(tweet_url)
 
         print(f"Posting reply {i+1}: '{comment_text}'")
@@ -94,7 +94,7 @@ async def post_thread(page, thread_data):
         if not new_tweet_url:
             print(f"Failed to get URL of reply {i+1}. Stopping thread here.")
             break
-        tweet_url = new_tweet_url
+        tweet_url = new_tweet_url # Chain the replies
 
 async def main():
     """
@@ -105,36 +105,43 @@ async def main():
         browser = await p.chromium.launch(headless=False)
         context = None
 
+        # --- Login/Cookie Flow ---
         if os.path.exists(COOKIES_FILE):
-            print(f"Loading cookies from {COOKIES_FILE}")
+            print(f"Found cookie file at {COOKIES_FILE}. Loading session.")
             context = await browser.new_context(storage_state=COOKIES_FILE)
-        else:
-            print("Cookie file not found. A new one will be created after you log in.")
-            context = await browser.new_context()
-
-        page = await context.new_page()
-
-        try:
-            print("Navigating to Twitter...")
-            await page.goto('https://twitter.com/home', timeout=60000)
-
-            is_login_required = await page.is_visible("a[href='/login']", timeout=5000)
-
-            if is_login_required:
-                print("Login required. Please log in to your Twitter account in the browser window.")
-                await page.wait_for_url("https://twitter.com/home", timeout=300000)
-                print("Login successful!")
-                print(f"Saving authentication state to {COOKIES_FILE}...")
-                await context.storage_state(path=COOKIES_FILE)
-                print("Cookies saved successfully.")
+            page = await context.new_page()
+            await page.goto('https://twitter.com/home')
+            # Verify login by checking for a unique element on the home page, e.g., the "For You" tab
+            if not await page.get_by_test_id("ScrollSnap-Home").is_visible(timeout=10000):
+                 print("Cookie login failed. Please log in manually.")
+                 # If cookie login fails, we fall through to the manual login process
+                 await context.close() # Close the failed context
+                 context = await browser.new_context()
+                 page = await context.new_page()
+                 await page.goto('https://twitter.com/login')
             else:
-                print("Successfully logged in using existing cookies.")
+                 print("Cookie login successful.")
 
+        if not context or not await page.get_by_test_id("ScrollSnap-Home").is_visible(timeout=1000):
+            if not context: # If context doesn't exist at all
+                context = await browser.new_context()
+                page = await context.new_page()
+
+            print("Cookie file not found or invalid. Please log in manually.")
+            await page.goto('https://twitter.com/login')
+            print("Waiting for you to complete login...")
+            await page.wait_for_url("https://twitter.com/home", timeout=300000)
+            print("Login successful! Saving session to a new cookie file...")
+            await context.storage_state(path=COOKIES_FILE)
+            print(f"Cookies saved to {COOKIES_FILE}.")
+
+        # --- Main Task ---
+        try:
             with open(CSV_FILE, mode='r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 threads = list(reader)
 
-            print(f"Found {len(threads)} threads to post from {CSV_FILE}.")
+            print(f"\nFound {len(threads)} threads to post from {CSV_FILE}.")
 
             for i, thread_data in enumerate(threads):
                 print(f"\n--- Posting Thread {i+1}/{len(threads)} ---")
@@ -142,6 +149,8 @@ async def main():
 
             success = True
 
+        except FileNotFoundError:
+            print(f"Error: The CSV file was not found at {CSV_FILE}. Please check the file path.")
         except Exception as e:
             print(f"\nAn error occurred: {e}")
             await page.screenshot(path=ERROR_SCREENSHOT_FILE)
@@ -155,11 +164,8 @@ async def main():
             await browser.close()
 
 def setup_files():
-    """
-    Creates dummy CSV file if it doesn't exist.
-    """
     if not os.path.exists(CSV_FILE):
-        print(f"Warning: CSV file '{os.path.basename(CSV_FILE)}' not found. Creating an example.")
+        print(f"Warning: CSV file not found. Creating an example at {CSV_FILE}.")
         with open(CSV_FILE, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             writer.writerow(['main_tweet', 'comment1', 'comment2'])
