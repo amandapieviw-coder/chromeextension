@@ -53,8 +53,9 @@ async def post_reply(page, reply_text):
     Posts a reply to the tweet currently open on the page.
     """
     print("Waiting for the reply textarea...")
-    reply_textarea_selector = "div[aria-label='Tweet your reply']"
-    textarea = page.locator(reply_textarea_selector)
+    # Use the generic, reliable XPath selector for the text area.
+    reply_textarea_selector = "//div[@contenteditable='true' and contains(@role, 'textbox')]"
+    textarea = page.locator(reply_textarea_selector).first
     await textarea.wait_for(state='visible', timeout=30000)
     await textarea.click()
     await textarea.fill(reply_text)
