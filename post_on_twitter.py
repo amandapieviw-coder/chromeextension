@@ -42,7 +42,9 @@ async def post_new_tweet(page, tweet_text):
     await textarea.fill(tweet_text)
 
     print("Clicking the 'Post' button for the new tweet...")
-    await page.get_by_test_id("tweetButton").click()
+    # Use the specific selector for the inline post button on the home timeline.
+    post_button_selector = "//button[@data-testid='tweetButtonInline' and .//span[text()='Post']]"
+    await page.locator(post_button_selector).click()
 
     return await get_tweet_url(page)
 
